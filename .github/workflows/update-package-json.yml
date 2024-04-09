@@ -1,0 +1,145 @@
+name: Update package.json
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: "git tag you want create. (sample 1.0.0)"
+        required: true
+        type: string
+      file-path:
+        description: "package.json path to update. You can input multiline paths. Supported files are `package.json`"
+        required: true
+        type: string
+      push-tag:
+        description: "true = push tag. false = no push tag."
+        required: false
+        type: boolean
+        default: true
+      ref:
+        description: "checkout ref"
+        required: false
+        type: string
+        default: ''
+      dry-run:
+        description: "true to simularate commit but not push change."
+        required: true
+        type: boolean
+        
+    outputs:
+      sha:
+        description: "Git commit sha after package.json has changed."
+        value: ${{ jobs.update-package-json.outputs.sha }}
+      branch-name:
+        description: Git branch name created.
+        value: ${{ jobs.update-package-json.outputs.branch-name }}
+      is-branch-created:
+        description: Indicate is Git branch created or not.
+        value: ${{ jobs.update-package-json.outputs.is-branch-created }}
+        
+jobs:
+  update-package-json:
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    outputs: 
+      sha: ${{ steps.commit.outputs.sha }}
+      branch-name: ${{ steps.configure.outputs.branch-name }}
+      is-branch-created: ${{ steps.commit.outputs.is-branch-created }}
+    steps:
+      - name: Configure Output variables
+        id: configure
+        run: |
+          echo "branch-name=test-release/${{ inputs.tag }}" | tee -a "$GITHUB_OUTPUT"
+          
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+      - name: Update files to version ${{ inputs.tag }}
+        run: |
+          expected="${{ inputs.tag }}"
+          while read -r file_path; do
+            if [[ "$file_path" == "" ]]; then continue; fi
+
+            echo "Start $file_path"
+            file_name=$(basename "$file_path")
+
+            echo "::group::Before"
+              cat "$file_path"
+            echo "::endgroup::"
+
+            echo "::group::Updating"
+              if [[ "${file_name}" == "package.json" ]]; then
+                # Unity `"version": "VersionString",`
+                sed -i -e "s/\(\"version\":\) \"\(.*\)\",/\1 \"${{ inputs.tag }}\",/" "${file_path}"
+              else
+                echo "Unknown file name ${file_name} is specified."
+                exit 1
+              fi
+            echo "::endgroup::"
+
+            echo "::group::After"
+              cat "$file_path"
+            echo "::endgroup::"
+
+            echo "::group::Validate Change"
+              if [[ "${file_name}" == "package.json" ]]; then
+                actual=$(grep "\"version\":" "$file_path" | cut -d ':' -f 2 | tr -d ',' | tr -d '"' | tr -d ' ')
+                echo "${actual}"
+              else
+                echo "Validation for ${file_name} is not implemented."
+                exit 1
+              fi
+
+              echo "${actual}"
+
+              if [[ "$actual" != "$expected" ]]; then
+                echo "Failed. Path: $file_path, Expected: $expected, Actual: $actual"
+                exit 1
+              else
+                echo "Success. Path: $file_path, Expected: $expected, Actual: $actual"
+              fi
+            echo "::endgroup::"
+          done <<< "${{ inputs.file-path }}"
+
+
+      - name: Check update on git
+        id: check_update
+        run: git diff --exit-code || echo "changed=1" | tee -a "$GITHUB_OUTPUT"
+
+      - name: Commit files (updated? = ${{ steps.check_update.outputs.changed == '1' }})
+        id: commit
+        run: |
+          if [[ "${{ steps.check_update.outputs.changed }}" == "1" ]]; then
+            git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git config --local user.name "github-actions[bot]"
+            git commit -m "feat: Update package.json to ${{ inputs.tag }}" -a
+            echo "sha=$(git rev-parse HEAD)" | tee -a "$GITHUB_OUTPUT"
+            echo "is-branch-created=${{ inputs.dry-run }}" | tee -a "$GITHUB_OUTPUT"
+          elif [[ "${{ inputs.ref }}" != "" ]]; then
+            echo "sha=$(git rev-parse HEAD)" | tee -a "$GITHUB_OUTPUT"
+            echo "is-branch-created=false" | tee -a "$GITHUB_OUTPUT"
+          else
+            echo "sha=" | tee -a "$GITHUB_OUTPUT"
+            echo "is-branch-created=false" | tee -a "$GITHUB_OUTPUT"
+          fi
+          
+      - name: Create Tag
+        if: ${{ steps.check_update.outputs.changed == '1' && inputs.push-tag }}
+        run: git tag ${{ inputs.tag }}
+
+      - name: Push changes
+        if: ${{ !inputs.dry-run && steps.check_update.outputs.changed == '1' }}
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ inputs.ref }}
+          tags: ${{ inputs.push-tag }}
+
+      - name: Push changes (dry-run)
+        if: ${{ inputs.dry-run && steps.check_update.outputs.changed == '1' }}
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: "refs/heads/${{ steps.configure.outputs.branch-name }}"
+          tags: false
+          force: true

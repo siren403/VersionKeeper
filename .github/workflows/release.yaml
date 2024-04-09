@@ -1,0 +1,58 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "git tag you want create. (sample 1.0.0)"
+        required: true
+        type: string
+      dry-run:
+        description: "dry-run: true will never create relase/nuget."
+        required: true
+        default: false
+        type: boolean
+      release-format: # see: https://docs.github.com/en/actions/learn-github-actions/expressions#format
+        description: "Release format. (if 'Ver.{0}' is specified, the release title will be 'Ver.1.0.0'. set '{0}' if no prefix is preferred.)"
+        required: false
+        type: string
+        default: 'Ver.{0}'
+
+jobs:
+  update-package-json:
+    uses: ./.github/workflows/update-package-json.yml
+    with:
+      tag: ${{ inputs.tag }}
+      file-path: |
+        ./Packages/VersionKeeper/package.json
+      dry-run: ${{ inputs.dry-run }}
+  create-release:
+    needs: [ update-package-json ]
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.update-package-json.outputs.sha }}
+      - name: Create Tag
+        run: |
+          git tag ${{ inputs.tag }}
+          git push origin ${{ inputs.tag }}
+      - name: Create Release
+        run: gh release create ${{ inputs.tag }} --draft --verify-tag --title "${{ format(inputs.release-format, inputs.tag) }}" --generate-notes
+      - name: Wait and Verify Release Name is expected
+        run: |
+          sleep 5s
+          actual=$(gh api /repos/${{ github.repository }}/releases --jq ".[] | select(.tag_name==\"${{ inputs.tag }}\") | .name")
+          expected="${{ format(inputs.release-format, inputs.tag) }}"
+          if [[ "$actual" != "$expected" ]]; then echo "Release name is not as expected. expected: $expected, actual: $actual"; exit 1; fi
+      
+      # Clean up
+      - name: Clean up. Wait 60s and delete release if dry-run or failure.
+        if: ${{ inputs.dry-run || failure() }}
+        run: |
+          if gh release list | grep Draft | grep ${{ inputs.tag }}; then
+            sleep 60
+            gh release delete ${{ inputs.tag }} --yes --cleanup-tag
+          fi
