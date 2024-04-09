@@ -1,0 +1,20 @@
+{
+    "name": "VersionKeeper.Tests.Editor",
+    "rootNamespace": "VersionKeeper.Tests.Editor",
+    "references": [
+        "VersionKeeper"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

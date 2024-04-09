@@ -2,7 +2,7 @@
     "name": "VersionKeeper.Editor",
     "rootNamespace": "VersionKeeper.Editor",
     "references": [
-        "VersionKeeper.Runtime"
+        "VersionKeeper"
     ],
     "includePlatforms": [
         "Editor"

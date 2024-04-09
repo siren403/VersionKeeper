@@ -1,0 +1,15 @@
+{
+    "name": "VersionKeeper.Tests",
+    "rootNamespace": "VersionKeeper.Tests",
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "references": [
+        "VersionKeeper",
+        "UnityEngine.TestRunner"
+    ],
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ]
+}
