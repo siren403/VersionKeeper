@@ -1,7 +1,7 @@
 ﻿{
     "name": "com.siren403.version-keeper",
     "displayName": "Version Keeper",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "unity": "2021.3",
     "description": "Get App Version",
     "documentationUrl": "",
