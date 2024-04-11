@@ -1,11 +1,10 @@
 ﻿using System;
-using UnityEditor.Build;
 
 namespace VersionKeeper
 {
     public static class VersionManager
     {
-        public static readonly Version InitialVersion = new(0, 1, 0);
+        internal static readonly Version InitialVersion = new(0, 1, 0);
 
         private static VersionStore _versionStore;
 
@@ -19,6 +18,13 @@ namespace VersionKeeper
             return _versionStore == null
                 ? InitialVersion.ToString()
                 : _versionStore.Version.ToString();
+        }
+
+        public static Version GetVersion()
+        {
+            return _versionStore == null
+                ? InitialVersion
+                : _versionStore.Version;
         }
     }
 }
